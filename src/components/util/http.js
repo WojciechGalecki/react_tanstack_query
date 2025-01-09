@@ -11,7 +11,7 @@ export async function fetchEvents({ signal, searchTerm }) {
     url += `?search=${searchTerm}`;
   }
 
-  const response = await fetch(url, { signal: signal });
+  const response = await fetch(url, { signal });
 
   if (!response.ok) {
     const error = new Error("An error occurred while fetching the events");
@@ -23,6 +23,36 @@ export async function fetchEvents({ signal, searchTerm }) {
   const { events } = await response.json();
 
   return events;
+}
+
+export async function fetchEvent({ id, signal }) {
+  const response = await fetch(`${BASE_URL}/${id}`, { signal });
+
+  if (!response.ok) {
+    const error = new Error("An error occurred while fetching the event");
+    error.code = response.status;
+    error.info = await response.json();
+    throw error;
+  }
+
+  const { event } = await response.json();
+
+  return event;
+}
+
+export async function deleteEvent({ id }) {
+  const response = await fetch(`${BASE_URL}/${id}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    const error = new Error("An error occurred while deleting the event");
+    error.code = response.status;
+    error.info = await response.json();
+    throw error;
+  }
+
+  return response.json();
 }
 
 export async function createNewEvent(eventData) {
