@@ -1,44 +1,32 @@
-import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  Link,
+  redirect,
+  useNavigate,
+  useNavigation,
+  useParams,
+  useSubmit,
+} from "react-router-dom";
 
 import Modal from "../UI/Modal.jsx";
 import EventForm from "./EventForm.jsx";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { fetchEvent, queryClient, updateEvent } from "../util/http.js";
-import LoadingIndicator from "../UI/LoadingIndicator.jsx";
 import ErrorBlock from "../UI/ErrorBlock.jsx";
 
 export default function EditEvent() {
   const navigate = useNavigate();
+  const { state } = useNavigation();
   const { id } = useParams();
+  const submit = useSubmit();
 
-  const { data, isPending, isError, error } = useQuery({
+  const { data, isError, error } = useQuery({
     queryKey: ["events", id],
     queryFn: (signal) => fetchEvent({ id, signal }),
-  });
-
-  const { mutate } = useMutation({
-    queryFn: updateEvent,
-    onMutate: async (data) => {
-      const newEvent = data.event;
-      const queryKey = ["events", id];
-      await queryClient.cancelQueries({ queryKey });
-      const previousEvent = queryClient.getQueryData(queryKey);
-      queryClient.setQueryData(queryKey, newEvent);
-
-      return { previousEvent }; // context
-    },
-    onError: (error, data, context) => {
-      // rollback function for optimistic update
-      queryClient.setQueryData(["events", id], context.previousEvent);
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries(["events", id]);
-    },
+    staleTime: 10000, // useQuery will use cached data fetched before by the 'loader' function
   });
 
   function handleSubmit(formData) {
-    mutate({ id, event: formData });
-    navigate("../");
+    submit(formData, { method: "PUT" }); // trigger for running 'action'function by react router
   }
 
   function handleClose() {
@@ -46,14 +34,6 @@ export default function EditEvent() {
   }
 
   let content;
-
-  if (isPending) {
-    content = (
-      <div className="center">
-        <LoadingIndicator />
-      </div>
-    );
-  }
 
   if (isError) {
     content = (
@@ -76,15 +56,37 @@ export default function EditEvent() {
   if (data) {
     content = (
       <EventForm inputData={data} onSubmit={handleSubmit}>
-        <Link to="../" className="button-text">
-          Cancel
-        </Link>
-        <button type="submit" className="button">
-          Update
-        </button>
+        {state === "submitting" ? (
+          <p>Sending data...</p>
+        ) : (
+          <>
+            <Link to="../" className="button-text">
+              Cancel
+            </Link>
+            <button type="submit" className="button">
+              Update
+            </button>
+          </>
+        )}
       </EventForm>
     );
   }
 
   return <Modal onClose={handleClose}>{content}</Modal>;
+}
+
+export function editEventLoader({ params }) {
+  queryClient.fetchQuery({
+    queryKey: ["events", params.id],
+    queryFn: (signal) => fetchEvent({ id: params.id, signal }),
+  });
+  return null;
+}
+
+export async function editEventAction({ request, params }) {
+  const formData = await request.formData();
+  const updatedEvent = Object.fromEntries(formData);
+  await updateEvent({ id: params.id, event: updatedEvent });
+  await queryClient.invalidateQueries(["events"]);
+  return redirect("../");
 }
