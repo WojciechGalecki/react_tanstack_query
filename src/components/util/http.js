@@ -4,11 +4,15 @@ const BASE_URL = "http://localhost:3000/events";
 
 export const queryClient = new QueryClient();
 
-export async function fetchEvents({ signal, searchTerm }) {
+export async function fetchEvents({ signal, searchTerm, max }) {
   let url = BASE_URL;
 
-  if (searchTerm) {
+  if (searchTerm && max) {
+    url += `?serch=${searchTerm}&max=${max}`;
+  } else if (searchTerm) {
     url += `?search=${searchTerm}`;
+  } else if (max) {
+    url += `?max=${max}`;
   }
 
   const response = await fetch(url, { signal });
